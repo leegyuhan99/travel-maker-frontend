@@ -1,39 +1,36 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Footer } from '@/components/layout/Footer'
-import { Header } from '@/components/layout/Header'
+import type { ReactNode } from 'react'
+import localFont from 'next/font/local'
+import { css } from '@/styled-system/css'
 import '@/styles/globals.css'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
+const pretendard = localFont({
+  src: '../assets/fonts/PretendardVariable.woff2',
+  variable: '--font-pretendard',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
   title: 'Travel Maker',
-  description: '국내 여행 추천 서비스',
+  description: '국내 여행 취향 기반 추천 서비스',
 }
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: ReactNode
 }>) {
   return (
-    <html
-      lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full">
-        <div className="flex min-h-screen flex-col">
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
+    <html lang="ko" suppressHydrationWarning className={pretendard.variable}>
+      <body>
+        <div
+          className={css({
+            minH: '100vh',
+            bg: 'bg.canvas',
+            color: 'text.primary',
+          })}
+        >
+          {children}
         </div>
       </body>
     </html>

@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -45,4 +46,12 @@ styled-system
 styled-system-studio
 # Claude settings
 .claude/settings.local.json
+.claude/scripts/
+
+# Work logs (local only)
+docs/work-log/
+
+# Work log (로컬 작업 기록 — 커밋 제외)
+docs/work-log/
+.claude/scripts/
 
