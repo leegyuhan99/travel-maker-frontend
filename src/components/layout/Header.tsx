@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { LoginModal } from '@/components/auth/LoginModal'
 import { Button, IconButton } from '@/components/common/button'
 import { LayoutContainer } from '@/components/layout/LayoutContainer'
+import { ProfileDropdown } from '@/components/layout/ProfileDropdown'
 import { ROUTES } from '@/constants/routes'
+import { useAuthStore } from '@/features/auth/store/useAuthStore'
 import { css, cx } from '@/styled-system/css'
 
 const navigationItems = [
@@ -79,29 +81,9 @@ const navLinkStyle = css({
   },
 })
 
-const profileLinkStyle = css({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: '10',
-  height: '10',
-  borderRadius: 'pill',
-  bg: 'primary.soft',
-  borderWidth: '1px',
-  borderColor: 'primary',
-  color: 'primary',
-  fontSize: 'sm',
-  fontWeight: 'bold',
-  transitionProperty: 'border-color, box-shadow, transform',
-  transitionDuration: '150ms',
-  _hover: {
-    boxShadow: 'focus',
-    transform: 'translateY(-1px)',
-  },
-  _focusVisible: {
-    outline: 'none',
-    boxShadow: 'focus',
-  },
+const authPlaceholderStyle = css({
+  width: { base: '8', sm: '72px' },
+  height: '8',
 })
 
 const desktopLoginButtonStyle = css({
@@ -113,12 +95,13 @@ const mobileLoginButtonStyle = css({
 })
 
 interface HeaderProps {
-  isAuthenticated?: boolean
   className?: string
 }
 
-export function Header({ isAuthenticated = false, className }: HeaderProps) {
+export function Header({ className }: HeaderProps) {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn)
+  const isAuthInitialized = useAuthStore((state) => state.isAuthInitialized)
 
   const openLoginModal = () => setIsLoginModalOpen(true)
   const closeLoginModal = () => setIsLoginModalOpen(false)
@@ -140,14 +123,10 @@ export function Header({ isAuthenticated = false, className }: HeaderProps) {
               ))}
             </nav>
 
-            {isAuthenticated ? (
-              <Link
-                href={ROUTES.PROFILE('me')}
-                aria-label="마이페이지로 이동"
-                className={profileLinkStyle}
-              >
-                TM
-              </Link>
+            {!isAuthInitialized ? (
+              <div aria-hidden="true" className={authPlaceholderStyle} />
+            ) : isLoggedIn ? (
+              <ProfileDropdown />
             ) : (
               <>
                 <Button

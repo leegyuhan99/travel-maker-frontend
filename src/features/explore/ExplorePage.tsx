@@ -8,8 +8,10 @@ import { X } from 'lucide-react'
 import { travelCategories, getAllDestinations } from '@/mocks/data/travel-data'
 import { travelFilterSections } from '@/lib/filter-data'
 import { FilterCard } from '@/components/filters/filter-card'
+import { LoginModal } from '@/components/auth/LoginModal'
 import { Pagination } from '@/components/ui/Pagination/Pagination'
 import { PlaceCard } from '@/components/ui/PlaceCard/PlaceCard'
+import { ROUTES } from '@/constants/routes'
 import { css } from '@/styled-system/css'
 
 const ITEMS_PER_PAGE = 12
@@ -70,9 +72,14 @@ function getFilterChips(selected: Record<string, string[]>) {
   return chips
 }
 
-function ExploreContent() {
+interface ExploreContentProps {
+  isAuthenticated: boolean
+}
+
+function ExploreContent({ isAuthenticated }: ExploreContentProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
 
   const categoryId = searchParams.get('category')
   const sort = (searchParams.get('sort') ?? 'popular') as SortKey
@@ -485,18 +492,33 @@ function ExploreContent() {
                 })}
               >
                 {paginatedItems.map((destination, index) => (
-                  <PlaceCard
+                  <div
                     key={destination.id}
-                    placeId={(currentPage - 1) * ITEMS_PER_PAGE + index}
-                    placeName={destination.name}
-                    description={destination.description}
-                    tags={destination.tags}
-                    rating={destination.rating}
-                    imageUrl={destination.image}
-                    variant="bookmark"
-                    isLiked={false}
-                    onLikeToggle={() => {}}
-                  />
+                    onClick={(e) => {
+                      if (!(e.target as HTMLElement).closest('button')) {
+                        e.preventDefault()
+                        router.push(ROUTES.DETAIL(destination.id))
+                      }
+                    }}
+                    className={css({ cursor: 'pointer' })}
+                  >
+                    <PlaceCard
+                      placeId={(currentPage - 1) * ITEMS_PER_PAGE + index}
+                      placeName={destination.name}
+                      description={destination.description}
+                      tags={destination.tags}
+                      rating={destination.rating}
+                      imageUrl={destination.image}
+                      variant="bookmark"
+                      isLiked={false}
+                      onLikeToggle={() => {
+                        if (!isAuthenticated) {
+                          setIsLoginModalOpen(true)
+                        }
+                        // TODO: 찜하기 API 호출
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
 
@@ -539,14 +561,22 @@ function ExploreContent() {
           )}
         </div>
       </section>
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
     </main>
   )
 }
 
-export default function ExplorePage() {
+interface ExplorePageProps {
+  isAuthenticated: boolean
+}
+
+export default function ExplorePage({ isAuthenticated }: ExplorePageProps) {
   return (
     <Suspense fallback={null}>
-      <ExploreContent />
+      <ExploreContent isAuthenticated={isAuthenticated} />
     </Suspense>
   )
 }
