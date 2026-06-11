@@ -1,15 +1,28 @@
 'use client'
 
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react'
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import axios from 'axios'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
-import { travelCategories, getAllDestinations } from '@/mocks/data/travel-data'
+import { travelCategories } from '@/mocks/data/travel-data'
 import { travelFilterSections } from '@/lib/filter-data'
+import { getPlaces, getPlacesFilter, getPlacesSearch } from './api/placesApi'
+import { getTags } from './api/tagsApi'
+import { postBookmark, deleteBookmark } from '@/features/mypage/api/bookmarkApi'
+import type { Place, GetPlacesFilterParams } from './types/places.types'
+import type { Tag } from './types/tags.types'
 import { FilterCard } from '@/components/filters/filter-card'
 import { LoginModal } from '@/components/auth/LoginModal'
 import { Pagination } from '@/components/ui/Pagination/Pagination'
+import { useAuthStore } from '@/features/auth/store/useAuthStore'
 import { PlaceCard } from '@/components/ui/PlaceCard/PlaceCard'
 import { ROUTES } from '@/constants/routes'
 import { css } from '@/styled-system/css'
@@ -22,6 +35,15 @@ const SORT_LABELS: Record<SortKey, string> = {
   popular: '인기순',
   bookmarks: '북마크순',
   reviews: '리뷰순',
+}
+
+const SORT_API_MAP: Record<
+  SortKey,
+  Pick<GetPlacesFilterParams, 'sort' | 'order'>
+> = {
+  popular: {},
+  bookmarks: { sort: 'bookmark', order: 'desc' },
+  reviews: { sort: 'review', order: 'desc' },
 }
 
 const DEFAULT_BG =
@@ -37,12 +59,61 @@ const STYLE_TO_CATEGORY: Record<string, string> = {
   romantic: 'romantic',
 }
 
-function hash(str: string): number {
-  let h = 0
-  for (let i = 0; i < str.length; i++) {
-    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0
-  }
-  return Math.abs(h)
+const CATEGORY_TO_TAG_NAME: Record<string, string> = {
+  beach: '해변',
+  mountain: '산악',
+  city: '도시',
+  culture: '문화',
+  food: '미식',
+  adventure: '액티비티',
+  romantic: '로맨틱',
+}
+
+const FILTER_TAG_TO_TAG_NAME: Record<string, string> = {
+  'beach-coast': '해수욕·해안',
+  'water-sports': '수상레저',
+  camping: '캠핑·글램핑',
+  'mountain-valley': '산·숲·계곡',
+  'nature-eco': '자연생태',
+  trekking: '자연공원·트레킹',
+  landmark: '랜드마크',
+  'park-street': '공원·거리',
+  shopping: '쇼핑',
+  history: '역사·유적',
+  museum: '박물관·전시',
+  traditional: '전통체험',
+  restaurant: '음식점',
+  cafe: '카페·디저트',
+  market: '시장·먹거리',
+  'land-sports': '육상스포츠',
+  extreme: '항공·익스트림',
+  'theme-park': '테마파크·시설',
+  spa: '스파·웰니스',
+  resort: '숙박·리조트',
+  solo: '혼자',
+  couple: '커플',
+  family: '가족',
+  friends: '친구',
+  seoul: '서울',
+  gyeonggi: '경기',
+  incheon: '인천',
+  gangwon: '강원',
+  chungbuk: '충북',
+  chungnam: '충남',
+  daejeon: '대전',
+  sejong: '세종',
+  jeonbuk: '전북',
+  jeonnam: '전남',
+  gwangju: '광주',
+  gyeongbuk: '경북',
+  gyeongnam: '경남',
+  daegu: '대구',
+  ulsan: '울산',
+  busan: '부산',
+  jeju: '제주',
+  parking: '주차',
+  pet: '반려동물',
+  free: '무료',
 }
 
 function parseParams(
@@ -72,27 +143,157 @@ function getFilterChips(selected: Record<string, string[]>) {
   return chips
 }
 
-interface ExploreContentProps {
-  isAuthenticated: boolean
-}
-
-function ExploreContent({ isAuthenticated }: ExploreContentProps) {
+function ExploreContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { isLoggedIn, isAuthInitialized } = useAuthStore()
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
 
   const categoryId = searchParams.get('category')
   const sort = (searchParams.get('sort') ?? 'popular') as SortKey
+  const keyword = searchParams.get('keyword') ?? ''
   const selected = useMemo(() => parseParams(searchParams), [searchParams])
   const filterChips = useMemo(() => getFilterChips(selected), [selected])
 
+  const [tags, setTags] = useState<Tag[] | null>(null)
   const [previewStyle, setPreviewStyle] = useState<string[] | null>(null)
+  const [places, setPlaces] = useState<Place[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [fetchedKey, setFetchedKey] = useState<string | null>(null)
+  const [searchInput, setSearchInput] = useState(keyword)
   const gridRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    getTags()
+      .then(setTags)
+      .catch(() => setTags([]))
+  }, [])
 
   const currentPage = Math.max(
     1,
     parseInt(searchParams.get('page') ?? '1', 10) || 1
   )
+
+  const selectedTagIds = useMemo(() => {
+    const tagNameToId = new Map((tags ?? []).map((t) => [t.tag_name, t.id]))
+    const ids: number[] = []
+
+    const styleValues = (selected.style ?? []).filter((s) => s !== 'all')
+    for (const s of styleValues) {
+      const cat = STYLE_TO_CATEGORY[s] ?? s
+      const id = tagNameToId.get(CATEGORY_TO_TAG_NAME[cat] ?? '')
+      if (id !== undefined) ids.push(id)
+    }
+
+    for (const section of ['theme', 'companion', 'region', 'facility']) {
+      for (const v of selected[section] ?? []) {
+        const id = tagNameToId.get(FILTER_TAG_TO_TAG_NAME[v] ?? '')
+        if (id !== undefined) ids.push(id)
+      }
+    }
+
+    if (ids.length === 0 && categoryId) {
+      const id = tagNameToId.get(CATEGORY_TO_TAG_NAME[categoryId] ?? '')
+      if (id !== undefined) return [id]
+    }
+
+    return ids
+  }, [selected, categoryId, tags])
+
+  const selectedTagIdsKey = selectedTagIds.join(',')
+
+  const hasActiveFilter =
+    ['style', 'theme', 'companion', 'region', 'facility'].some((section) => {
+      const raw = searchParams.get(section) ?? ''
+      return raw.split(',').some((v) => v && v !== 'all')
+    }) || !!categoryId
+  const pendingTag = hasActiveFilter && tags === null ? 'pending' : ''
+  const currentKey = `${currentPage}-${selectedTagIdsKey}-${sort}-${keyword}-${pendingTag}`
+  const isLoading = fetchedKey !== currentKey
+
+  const handleLikeToggle = async (placeId: number) => {
+    if (!isAuthInitialized || !isLoggedIn) {
+      setIsLoginModalOpen(true)
+      return
+    }
+
+    const targetPlace = places.find((p) => p.id === placeId)
+    if (!targetPlace) return
+
+    const isAdding = !targetPlace.is_liked
+    const originalPlaces = [...places]
+    setPlaces((prev) =>
+      prev.map((p) => (p.id === placeId ? { ...p, is_liked: isAdding } : p))
+    )
+
+    try {
+      if (isAdding) {
+        await postBookmark(placeId)
+      } else {
+        await deleteBookmark(placeId)
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        return
+      }
+
+      setPlaces(originalPlaces)
+      alert('처리에 실패했습니다. 다시 시도해주세요.')
+    }
+  }
+
+  useEffect(() => {
+    if (!isAuthInitialized) return
+
+    let cancelled = false
+    const key = `${currentPage}-${selectedTagIdsKey}-${sort}-${keyword}-${pendingTag}`
+    if (pendingTag) return
+
+    const tagIds = selectedTagIdsKey
+      ? selectedTagIdsKey.split(',').map(Number)
+      : []
+    const sortParams = SORT_API_MAP[sort]
+    const hasTags = tagIds.length > 0
+    const hasKeyword = keyword.trim().length > 0
+    const hasSortOption = sort !== 'popular'
+
+    let request: ReturnType<typeof getPlaces>
+
+    if (hasTags || hasSortOption) {
+      request = getPlacesFilter({
+        ...(hasTags ? { tags: tagIds } : {}),
+        ...(hasKeyword ? { keyword: keyword.trim() } : {}),
+        ...sortParams,
+        page: currentPage,
+        page_size: ITEMS_PER_PAGE,
+      })
+    } else if (hasKeyword) {
+      request = getPlacesSearch({
+        keyword: keyword.trim(),
+        page: currentPage,
+        page_size: ITEMS_PER_PAGE,
+      })
+    } else {
+      request = getPlaces({ page: currentPage, page_size: ITEMS_PER_PAGE })
+    }
+
+    request
+      .then((data) => {
+        if (cancelled) return
+        setPlaces(data.results)
+        setTotalCount(data.count)
+        setFetchedKey(key)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setPlaces([])
+        setFetchedKey(key)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentPage, selectedTagIdsKey, sort, keyword, pendingTag, isAuthInitialized])
 
   const handleFilterChange = useCallback(
     (liveSelected: Record<string, string[]>) => {
@@ -124,58 +325,7 @@ function ExploreContent({ isAuthenticated }: ExploreContentProps) {
   const heroDesc =
     activeCategory?.description ?? '세계 각지의 여행지를 탐색해 보세요'
 
-  const all = useMemo(() => getAllDestinations(), [])
-
-  const filtered = useMemo(() => {
-    let result = all
-
-    if (categoryId) {
-      result = result.filter((d) => d.categoryId === categoryId)
-    }
-
-    if (selected.style?.length && !selected.style.includes('all')) {
-      const cats = selected.style
-        .map((s) => STYLE_TO_CATEGORY[s])
-        .filter(Boolean)
-      if (cats.length) {
-        result = result.filter((d) => cats.includes(d.categoryId))
-      }
-    }
-
-    if (selected.region?.length) {
-      result = result.filter((d) => d.location.includes('대한민국'))
-    }
-
-    return result
-  }, [all, categoryId, selected])
-
-  const sorted = useMemo(() => {
-    const arr = [...filtered]
-    if (sort === 'popular') {
-      return arr.sort((a, b) => b.rating - a.rating)
-    }
-    if (sort === 'bookmarks') {
-      return arr.sort(
-        (a, b) => (hash(b.id + 'bm') % 1000) - (hash(a.id + 'bm') % 1000)
-      )
-    }
-    if (sort === 'reviews') {
-      return arr.sort(
-        (a, b) => (hash(b.id + 'rv') % 5000) - (hash(a.id + 'rv') % 5000)
-      )
-    }
-    return arr
-  }, [filtered, sort])
-
-  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE)
-  const paginatedItems = useMemo(
-    () =>
-      sorted.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-      ),
-    [sorted, currentPage]
-  )
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
   function goToPage(page: number) {
     const params = new URLSearchParams(searchParams.toString())
@@ -208,24 +358,14 @@ function ExploreContent({ isAuthenticated }: ExploreContentProps) {
     if (searchParams.get('sort')) {
       params.set('sort', searchParams.get('sort')!)
     }
+    const trimmedInput = searchInput.trim()
+    if (trimmedInput) {
+      params.set('keyword', trimmedInput)
+    }
     for (const [key, values] of Object.entries(newSelected)) {
       if (values.length > 0) {
         params.set(key, values.join(','))
       }
-    }
-    params.set('page', '1')
-    router.push(`/explore?${params.toString()}`, { scroll: false })
-  }
-
-  function removeFilter(sectionId: string, tagId: string) {
-    const params = new URLSearchParams(searchParams.toString())
-    const current = (params.get(sectionId) ?? '')
-      .split(',')
-      .filter((v) => v && v !== tagId)
-    if (current.length) {
-      params.set(sectionId, current.join(','))
-    } else {
-      params.delete(sectionId)
     }
     params.set('page', '1')
     router.push(`/explore?${params.toString()}`, { scroll: false })
@@ -240,6 +380,7 @@ function ExploreContent({ isAuthenticated }: ExploreContentProps) {
       params.set('sort', searchParams.get('sort')!)
     }
     params.set('page', '1')
+    setSearchInput('')
     router.push(`/explore?${params.toString()}`, { scroll: false })
   }
 
@@ -333,15 +474,17 @@ function ExploreContent({ isAuthenticated }: ExploreContentProps) {
           <FilterCard
             sections={travelFilterSections}
             initialSelected={selected}
-            resultCount={sorted.length}
+            resultCount={totalCount}
             onApply={applyFilters}
             onReset={clearAllFilters}
             onChange={handleFilterChange}
+            searchValue={searchInput}
+            onSearchChange={setSearchInput}
           />
         </div>
       </section>
 
-      {/* Sort + Count + Filter Chips */}
+      {/* Sort + Count */}
       <section
         className={css({
           py: 5,
@@ -362,7 +505,7 @@ function ExploreContent({ isAuthenticated }: ExploreContentProps) {
           >
             <p className={css({ fontSize: 'sm', color: 'text.secondary' })}>
               {hasFilter ? '필터 적용됨 · ' : ''}
-              {sorted.length}개의 여행지
+              {totalCount}개의 여행지
             </p>
             <div className={css({ display: 'flex', gap: '6px' })}>
               {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
@@ -395,89 +538,19 @@ function ExploreContent({ isAuthenticated }: ExploreContentProps) {
               ))}
             </div>
           </div>
-
-          {hasFilter && (
-            <div
-              className={css({
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '6px',
-                mt: 4,
-                alignItems: 'center',
-              })}
-            >
-              <span
-                className={css({
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: 'primary',
-                  mr: 1,
-                })}
-              >
-                필터
-              </span>
-              {filterChips.map((chip) => (
-                <span
-                  key={`${chip.sectionId}-${chip.tagId}`}
-                  className={css({
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    bg: 'primary/10',
-                    color: 'primary',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    px: '10px',
-                    py: '3px',
-                    borderRadius: '50px',
-                    border: '1.5px solid',
-                    borderColor: 'primary/20',
-                  })}
-                >
-                  {chip.label}
-                  <button
-                    type="button"
-                    aria-label={`${chip.label} 필터 제거`}
-                    onClick={() => removeFilter(chip.sectionId, chip.tagId)}
-                    className={css({
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      border: 'none',
-                      bg: 'transparent',
-                      color: 'inherit',
-                      p: 0,
-                      _hover: { color: 'text.primary' },
-                    })}
-                  >
-                    <X className={css({ w: '10px', h: '10px' })} />
-                  </button>
-                </span>
-              ))}
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className={css({
-                  fontSize: '11px',
-                  color: 'text.secondary',
-                  cursor: 'pointer',
-                  border: 'none',
-                  bg: 'transparent',
-                  _hover: { color: 'text.primary' },
-                  ml: 1,
-                })}
-              >
-                전체 초기화
-              </button>
-            </div>
-          )}
         </div>
       </section>
 
       {/* Destinations Grid */}
       <section ref={gridRef} className={css({ py: 10, px: 6 })}>
         <div className={css({ maxW: '7xl', mx: 'auto' })}>
-          {sorted.length > 0 ? (
+          {isLoading ? (
+            <div className={css({ textAlign: 'center', py: 20 })}>
+              <p className={css({ fontSize: 'sm', color: 'text.secondary' })}>
+                불러오는 중...
+              </p>
+            </div>
+          ) : places.length > 0 ? (
             <>
               <div
                 className={css({
@@ -491,32 +564,28 @@ function ExploreContent({ isAuthenticated }: ExploreContentProps) {
                   gap: 6,
                 })}
               >
-                {paginatedItems.map((destination, index) => (
+                {places.map((place) => (
                   <div
-                    key={destination.id}
+                    key={place.id}
                     onClick={(e) => {
                       if (!(e.target as HTMLElement).closest('button')) {
                         e.preventDefault()
-                        router.push(ROUTES.DETAIL(destination.id))
+                        router.push(ROUTES.DETAIL(String(place.id)))
                       }
                     }}
                     className={css({ cursor: 'pointer' })}
                   >
                     <PlaceCard
-                      placeId={(currentPage - 1) * ITEMS_PER_PAGE + index}
-                      placeName={destination.name}
-                      description={destination.description}
-                      tags={destination.tags}
-                      rating={destination.rating}
-                      imageUrl={destination.image}
+                      key={place.id}
+                      placeId={place.id}
+                      placeName={place.place_name}
+                      description={place.description}
+                      tags={place.tags.map((t) => t.tag_name)}
+                      rating={Number(place.rating_avg)}
+                      imageUrl={place.main_image}
                       variant="bookmark"
-                      isLiked={false}
-                      onLikeToggle={() => {
-                        if (!isAuthenticated) {
-                          setIsLoginModalOpen(true)
-                        }
-                        // TODO: 찜하기 API 호출
-                      }}
+                      isLiked={place.is_liked}
+                      onLikeToggle={handleLikeToggle}
                     />
                   </div>
                 ))}
@@ -569,14 +638,10 @@ function ExploreContent({ isAuthenticated }: ExploreContentProps) {
   )
 }
 
-interface ExplorePageProps {
-  isAuthenticated: boolean
-}
-
-export default function ExplorePage({ isAuthenticated }: ExplorePageProps) {
+export default function ExplorePage() {
   return (
     <Suspense fallback={null}>
-      <ExploreContent isAuthenticated={isAuthenticated} />
+      <ExploreContent />
     </Suspense>
   )
 }

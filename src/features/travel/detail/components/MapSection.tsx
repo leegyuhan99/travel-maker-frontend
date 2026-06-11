@@ -4,22 +4,32 @@ import { useEffect, useRef } from 'react'
 import { buttonRecipe } from '@/components/common/button/Button'
 import { css, cx } from '@/styled-system/css'
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
   interface Window {
     kakao: {
       maps: {
         load: (callback: () => void) => void
-        Map: new (
-          container: HTMLElement,
-          options: {
-            center: InstanceType<Window['kakao']['maps']['LatLng']>
-            level: number
+        Map: new (container: HTMLElement, options: any) => any
+        LatLng: new (lat: number, lng: number) => any
+        Marker: new (options: any) => any
+        CustomOverlay: new (options: any) => any
+        Polyline: new (options: any) => any
+        LatLngBounds: new () => any
+        event: {
+          addListener: (target: any, type: string, handler: any) => void
+        }
+        services: {
+          Places: new () => any
+          Geocoder: new () => {
+            coord2Address: (
+              lng: number,
+              lat: number,
+              callback: (result: any, status: string) => void
+            ) => void
           }
-        ) => unknown
-        LatLng: new (lat: number, lng: number) => unknown
-        Marker: new (options: {
-          position: InstanceType<Window['kakao']['maps']['LatLng']>
-        }) => { setMap: (map: unknown) => void }
+          Status: { OK: string }
+        }
       }
     }
   }

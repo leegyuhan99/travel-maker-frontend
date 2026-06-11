@@ -1,15 +1,18 @@
-import type { Review } from '../types/travelDetail.types'
+'use client'
+
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/common/button'
 import { EmptyState } from '@/components/common/status/EmptyState'
 import { css } from '@/styled-system/css'
+import { getPlaceReviews } from '../api/reviewApi'
+import type { Review } from '../types/travelDetail.types'
 import ReviewCard from './ReviewCard'
 import ReviewWriteButton from './ReviewWriteButton'
 
 interface ReviewsSectionProps {
-  reviews: Review[]
   reviewCount: number
-  isAuthenticated: boolean
+  placeId: number
 }
 
 const sectionStyle = css({
@@ -43,21 +46,32 @@ const moreButtonWrapperStyle = css({
 })
 
 export default function ReviewsSection({
-  reviews,
   reviewCount,
-  isAuthenticated,
+  placeId,
 }: ReviewsSectionProps) {
+  const [reviews, setReviews] = useState<Review[]>([])
+
+  useEffect(() => {
+    getPlaceReviews(placeId)
+      .then(setReviews)
+      .catch(() => {})
+  }, [placeId])
+
+  const handleDeleted = (reviewId: number) => {
+    setReviews((prev) => prev.filter((r) => r.id !== reviewId))
+  }
+
   return (
     <section aria-label="리뷰" className={sectionStyle}>
       <div className={headerStyle}>
         <h2 className={headingStyle}>리뷰</h2>
-        <ReviewWriteButton isAuthenticated={isAuthenticated} />
+        <ReviewWriteButton placeId={placeId} />
       </div>
 
       {reviews.length === 0 ? (
         <EmptyState
           title="아직 리뷰가 없어요"
-          description="첫 번째 리뷰를 남겨보세요."
+          description="첫 번째 리뷰를 남겨보세요"
         />
       ) : (
         <div className={reviewListStyle}>
@@ -65,7 +79,7 @@ export default function ReviewsSection({
             <ReviewCard
               key={review.id}
               review={review}
-              isAuthenticated={isAuthenticated}
+              onDeleted={handleDeleted}
             />
           ))}
         </div>
@@ -73,9 +87,9 @@ export default function ReviewsSection({
 
       {reviewCount > reviews.length && (
         <div className={moreButtonWrapperStyle}>
-          {/* TODO: 리뷰 더 보기 페이지네이션 또는 무한스크롤 연결 */}
+          {/* TODO: 리뷰 더보기 페이지네이션 또는 무한스크롤 연결 */}
           <Button variant="secondary" disabled>
-            리뷰 더 보기 ({reviewCount.toLocaleString()}개)
+            리뷰 더보기 ({reviewCount.toLocaleString()}개)
           </Button>
         </div>
       )}
