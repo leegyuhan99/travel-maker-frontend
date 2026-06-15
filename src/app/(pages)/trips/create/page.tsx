@@ -9,7 +9,16 @@ import {
   TimelineCard,
 } from '@/features/trips/SchedulePanel/SchedulePanel'
 import CourseMapPanel from '@/features/trips/CourseMapPanel'
+import { PlaceSearchSection } from '@/features/trips/CourseMapPanel/components/PlaceSearchSection'
 import { LayoutContainer } from '@/components/layout/LayoutContainer'
+
+import {
+  pageStyle,
+  headerStyle,
+  badgeDotStyle,
+  pageSubtitleStyle,
+  bodyStyle,
+} from '@/features/trips/styles/courseEditor.styles'
 
 import { css } from '@/styled-system/css'
 
@@ -18,16 +27,6 @@ export const metadata: Metadata = {
   description:
     '가고 싶은 장소를 지도에서 담고, 일정에 맞춰 나만의 여행 코스를 완성해보세요.',
 }
-
-const pageStyle = css({
-  minH: 'calc(100vh - 72px)',
-  bg: 'bg.canvas',
-})
-
-const headerStyle = css({
-  pt: '6',
-  pb: '4',
-})
 
 const badgeStyle = css({
   display: 'inline-flex',
@@ -39,38 +38,20 @@ const badgeStyle = css({
   color: 'primary',
   borderRadius: 'pill',
   fontSize: 'xs',
-  fontWeight: 'medium',
+  fontWeight: 'semibold',
   mb: '3',
-})
-
-const badgeDotStyle = css({
-  w: '1.5',
-  h: '1.5',
-  borderRadius: 'pill',
-  bg: 'primary',
-  flexShrink: 0,
 })
 
 const pageTitleStyle = css({
   fontSize: '3xl',
-  fontWeight: 'bold',
+  fontWeight: 'semibold',
   color: 'text.primary',
   lineHeight: 'tight',
   mb: '2',
 })
 
-const pageSubtitleStyle = css({
-  fontSize: 'sm',
-  color: 'text.secondary',
-})
-
-const bodyStyle = css({
-  display: 'flex',
-  alignItems: 'flex-start',
-})
-
 const leftStyle = css({
-  flex: '0 0 44%',
+  flex: '0 0 50%',
   minW: 0,
   pr: '3',
   py: '4',
@@ -80,14 +61,17 @@ const leftStyle = css({
 })
 
 const rightStyle = css({
-  flex: '0 0 56%',
+  flex: '0 0 50%',
   minW: 0,
-  position: 'sticky',
-  top: '72px',
-  height: 'calc(100vh - 72px)',
   pl: '3',
   py: '4',
-  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '3',
+})
+
+const searchWrapperStyle = css({
+  flexShrink: 0,
 })
 
 export default function TripsCreatePage() {
@@ -115,6 +99,9 @@ export default function TripsCreatePage() {
           </div>
           <div className={rightStyle}>
             <CourseMapPanel />
+            <div className={searchWrapperStyle}>
+              <PlaceSearchSection />
+            </div>
           </div>
         </div>
       </LayoutContainer>

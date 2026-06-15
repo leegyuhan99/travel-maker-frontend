@@ -7,11 +7,16 @@ import { isAxiosError } from 'axios'
 import { LoginModal } from '@/components/auth/LoginModal'
 import { Button } from '@/components/common/button'
 import { ReviewModal } from '@/components/common/ReviewModal/ReviewModal'
+import type { ReviewSubmitPayload } from '@/components/common/ReviewModal'
 import { useAuthStore } from '@/features/auth/store/useAuthStore'
-import { createPlaceReview } from '../api/reviewApi'
+import {
+  createReview,
+  uploadReviewImage,
+} from '@/features/reviews/api/reviewsApi'
 
 interface ReviewWriteButtonProps {
   placeId: number
+  onSuccess?: () => void
 }
 
 function getCreateReviewErrorMessage(error: unknown) {
@@ -38,7 +43,10 @@ function getCreateReviewErrorMessage(error: unknown) {
   return '리뷰 작성에 실패했습니다. 다시 시도해주세요.'
 }
 
-export default function ReviewWriteButton({ placeId }: ReviewWriteButtonProps) {
+export default function ReviewWriteButton({
+  placeId,
+  onSuccess,
+}: ReviewWriteButtonProps) {
   const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
@@ -70,11 +78,12 @@ export default function ReviewWriteButton({ placeId }: ReviewWriteButtonProps) {
     setIsModalOpen(false)
   }
 
-  const handleSubmit = async (
-    rating: number,
-    content: string,
-    image?: string
-  ) => {
+  const handleSubmit = async ({
+    rating,
+    content,
+    imageUrl,
+    imageFile,
+  }: ReviewSubmitPayload) => {
     const trimmedContent = content.trim()
 
     if (isSubmitting) {
@@ -100,12 +109,28 @@ export default function ReviewWriteButton({ placeId }: ReviewWriteButtonProps) {
     setErrorMessage(null)
 
     try {
-      await createPlaceReview(placeId, {
+      let uploadedImageUrl = imageUrl
+
+      if (imageFile) {
+        try {
+          uploadedImageUrl = await uploadReviewImage(imageFile)
+        } catch (error) {
+          setErrorMessage(
+            isAxiosError(error)
+              ? '이미지 업로드 URL 발급에 실패했습니다.'
+              : '이미지 업로드에 실패했습니다.'
+          )
+          return
+        }
+      }
+
+      await createReview(placeId, {
         rating,
         content: trimmedContent,
-        ...(image ? { image } : {}),
+        ...(uploadedImageUrl ? { image_url: uploadedImageUrl } : {}),
       })
       setIsModalOpen(false)
+      onSuccess?.()
       router.refresh()
     } catch (error) {
       const message = getCreateReviewErrorMessage(error)

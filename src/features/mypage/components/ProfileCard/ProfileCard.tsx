@@ -7,8 +7,15 @@ import type { UserProfile } from '@/types/mypage.types'
 interface ProfileCardProps {
   user: UserProfile
   isMyProfile: boolean
+  canEdit?: boolean
+  canManageAccount?: boolean
+  isFollowing?: boolean
+  isFollowLoading?: boolean
   onEditClick?: () => void
   onWithdrawClick?: () => void
+  onFollowToggle?: () => void
+  onFollowerClick?: () => void
+  onFollowingClick?: () => void
 }
 
 const cardStyle = css({
@@ -94,12 +101,6 @@ const statsRowStyle = css({
   gap: '4',
 })
 
-const statItemStyle = css({
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-})
-
 const statValueStyle = css({
   fontSize: 'md',
   fontWeight: 'bold',
@@ -158,6 +159,49 @@ const editButtonStyle = css({
   },
 })
 
+const followButtonStyle = css({
+  position: 'absolute',
+  top: '6',
+  right: '6',
+  display: 'inline-flex',
+  alignItems: 'center',
+  px: '4',
+  py: '2',
+  borderRadius: 'pill',
+  fontSize: 'sm',
+  fontWeight: 'semibold',
+  cursor: 'pointer',
+  transitionProperty: 'background-color, border-color, color',
+  transitionDuration: '150ms',
+  _focusVisible: {
+    outline: 'none',
+    boxShadow: 'focus',
+  },
+  _disabled: {
+    opacity: 0.6,
+    cursor: 'not-allowed',
+  },
+})
+
+const followingButtonStyle = css({
+  borderWidth: '1px',
+  borderColor: 'border',
+  bg: 'bg.surface',
+  color: 'text.secondary',
+  _hover: {
+    bg: 'bg.muted',
+  },
+})
+
+const notFollowingButtonStyle = css({
+  border: 'none',
+  bg: 'primary',
+  color: 'text.inverse',
+  _hover: {
+    bg: 'primary.hover',
+  },
+})
+
 const withdrawButtonStyle = css({
   position: 'absolute',
   bottom: '6',
@@ -184,11 +228,33 @@ const withdrawButtonStyle = css({
   },
 })
 
+const statButtonStyle = css({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  bg: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  px: '1',
+  py: '0',
+  borderRadius: 'sm',
+  _hover: {
+    opacity: 0.7,
+  },
+})
+
 export function ProfileCard({
   user,
   isMyProfile,
+  canEdit = isMyProfile,
+  canManageAccount = isMyProfile,
+  isFollowing = false,
+  isFollowLoading = false,
   onEditClick,
   onWithdrawClick,
+  onFollowToggle,
+  onFollowerClick,
+  onFollowingClick,
 }: ProfileCardProps) {
   return (
     <div className={cardStyle}>
@@ -215,7 +281,7 @@ export function ProfileCard({
       <div className={infoStyle}>
         <div className={nameRowStyle}>
           <span className={nicknameStyle}>{user.nickname}</span>
-          {isMyProfile && (
+          {canEdit && (
             <Link href="/test" className={badgeStyle}>
               성향테스트 하기
             </Link>
@@ -225,14 +291,22 @@ export function ProfileCard({
         {user.bio && <p className={bioStyle}>{user.bio}</p>}
 
         <div className={statsRowStyle}>
-          <div className={statItemStyle}>
+          <button
+            type="button"
+            className={statButtonStyle}
+            onClick={onFollowerClick}
+          >
             <span className={statValueStyle}>{user.follower_count}</span>
             <span className={statLabelStyle}>팔로워</span>
-          </div>
-          <div className={statItemStyle}>
+          </button>
+          <button
+            type="button"
+            className={statButtonStyle}
+            onClick={onFollowingClick}
+          >
             <span className={statValueStyle}>{user.following_count}</span>
             <span className={statLabelStyle}>팔로잉</span>
-          </div>
+          </button>
         </div>
 
         {user.tags.length > 0 && (
@@ -246,20 +320,31 @@ export function ProfileCard({
         )}
       </div>
 
-      {isMyProfile && onEditClick && (
+      {canEdit && onEditClick && (
         <button type="button" className={editButtonStyle} onClick={onEditClick}>
           <Pencil size={14} />
           프로필 수정
         </button>
       )}
 
-      {isMyProfile && onWithdrawClick && (
+      {canManageAccount && onWithdrawClick && (
         <button
           type="button"
           className={withdrawButtonStyle}
           onClick={onWithdrawClick}
         >
           회원탈퇴
+        </button>
+      )}
+
+      {!isMyProfile && onFollowToggle && (
+        <button
+          type="button"
+          className={`${followButtonStyle} ${isFollowing ? followingButtonStyle : notFollowingButtonStyle}`}
+          onClick={onFollowToggle}
+          disabled={isFollowLoading}
+        >
+          {isFollowing ? '팔로잉' : '팔로우'}
         </button>
       )}
     </div>

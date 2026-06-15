@@ -1,7 +1,7 @@
 import type {
-  UserProfile,
   BookmarkItem,
   ReviewItem,
+  UserProfile,
 } from '@/types/mypage.types'
 
 export const mockMyProfile: UserProfile = {
@@ -19,6 +19,7 @@ export const mockMyProfile: UserProfile = {
   following_count: 0,
   bookmark_count: 72,
   review_count: 99,
+  travel_type_name: null,
   created_at: '2026-01-01T00:00:00',
   updated_at: '2026-01-01T00:00:00',
 }
@@ -38,6 +39,7 @@ export const mockOtherProfile: UserProfile = {
   following_count: 0,
   bookmark_count: 72,
   review_count: 99,
+  travel_type_name: null,
   created_at: '2026-01-01T00:00:00',
   updated_at: '2026-01-01T00:00:00',
 }

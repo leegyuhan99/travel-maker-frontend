@@ -10,6 +10,7 @@ export type PlaceReviewItem = {
   rating: number
   content: string
   image_url: string | null
+  img_url?: string | null
   created_at: string
   updated_at: string
   is_owner: boolean
@@ -22,6 +23,7 @@ export type PlaceReviewsResponse = {
 }
 
 export type ReviewAuthor = {
+  id: number
   name: string
   avatarUrl?: string
 }
@@ -32,6 +34,7 @@ export type Review = {
   rating: number
   createdAt: string
   content: string
+  imageUrl: string | null
   isOwner?: boolean
 }
 
@@ -64,5 +67,5 @@ export type TravelDetail = {
   images: string[]
   tags: Tag[]
   info: PlaceInfo | null
-  is_liked?: boolean
+  is_bookmarked?: boolean
 }

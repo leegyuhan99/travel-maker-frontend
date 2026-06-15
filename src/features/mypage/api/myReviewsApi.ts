@@ -6,6 +6,8 @@ export type MyReviewItem = {
   place_name: string
   rating: number
   content: string
+  image_url?: string | null
+  img_url?: string | null
   // TODO: 백엔드에서 리뷰 이미지 URL 필드가 추가되면 image_url 타입을 연결한다.
   created_at: string
   updated_at: string
@@ -25,23 +27,6 @@ export type GetMyReviewsParams = {
   pageSize?: number
 }
 
-export type UpdateReviewRequest = {
-  rating: number
-  content: string
-  image_url?: string
-}
-
-export type UpdateReviewResponse = {
-  review_id?: number
-  place_id?: number
-  place_name?: string
-  rating?: number
-  content?: string
-  image_url?: string | null
-  created_at?: string
-  updated_at?: string
-}
-
 export async function getMyReviews({
   page = 1,
   pageSize = 4,
@@ -56,18 +41,19 @@ export async function getMyReviews({
   return response.data
 }
 
-export async function updateReview(
-  reviewId: number,
-  body: UpdateReviewRequest
+export async function getPublicUserReviews(
+  userId: number,
+  { page = 1, pageSize = 8 }: GetMyReviewsParams = {}
 ) {
-  const response = await api.patch<UpdateReviewResponse>(
-    `/reviews/${reviewId}`,
-    body
+  const response = await api.get<MyReviewsResponse>(
+    `/users/${userId}/reviews`,
+    {
+      params: {
+        page,
+        page_size: pageSize,
+      },
+    }
   )
 
   return response.data
-}
-
-export async function deleteReview(reviewId: number) {
-  await api.delete<void>(`/reviews/${reviewId}`)
 }
