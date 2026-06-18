@@ -39,6 +39,10 @@ export const logout = async () => {
   await api.post(LOGOUT_PATH)
 }
 
+export const withdrawUser = async (reason: string): Promise<void> => {
+  await api.delete('/auth/withdraw', { data: { reason } })
+}
+
 export type AvatarUpdateResponse = {
   updated: boolean
 }
@@ -46,7 +50,7 @@ export type AvatarUpdateResponse = {
 export const patchUserAvatar = async (
   travelTypeId: number
 ): Promise<AvatarUpdateResponse> => {
-  const response = await api.patch<AvatarUpdateResponse>('/users/avatar/', {
+  const response = await api.patch<AvatarUpdateResponse>('/users/avatar', {
     travel_type_id: travelTypeId,
   })
   return response.data
