@@ -1,8 +1,14 @@
 import api from '@/lib/api'
-import type { RecommendedDestination } from '@/features/result/result.types'
+
+export type RecommendedPlace = {
+  place_id: number | string | null
+  place_name: string
+  match_rate?: number
+}
 
 /** GET /api/v1/users/quiz/result 응답 스키마 */
 export type TravelTypeResultResponse = {
+  type_key?: string
   name: string
   description: string
   image_url: string
@@ -30,6 +36,7 @@ export type VectorItem = {
 }
 
 export type TravelTypeResult = {
+  type_key?: string
   name: string
   description: string
   image_url: string
@@ -37,7 +44,7 @@ export type TravelTypeResult = {
   /** 백엔드 라벨 + 0~100 값 배열 */
   result_vector: VectorItem[]
   accuracy: number
-  destinations: RecommendedDestination[]
+  destinations: RecommendedPlace[]
   updated_at: string
 }
 
@@ -85,7 +92,20 @@ function parseResultVector(raw: unknown): VectorItem[] {
     .filter((item): item is VectorItem => item !== null)
 }
 
-function parseDestinations(raw: unknown): RecommendedDestination[] {
+function parsePlaceId(value: unknown): number | string | null {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) && value > 0 ? value : null
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim()
+    return /^\d+$/.test(normalized) && normalized !== '0' ? normalized : null
+  }
+
+  return null
+}
+
+function parseDestinations(raw: unknown): RecommendedPlace[] {
   const arr = toArray(raw)
   if (!Array.isArray(arr)) return []
 
@@ -93,16 +113,12 @@ function parseDestinations(raw: unknown): RecommendedDestination[] {
     if (!isRecord(item)) return []
     return [
       {
-        id: String(item.place_id ?? ''),
-        imageSrc:
-          typeof item.image_url === 'string' && item.image_url
-            ? item.image_url
-            : undefined,
-        title: typeof item.place_name === 'string' ? item.place_name : '',
-        description:
-          typeof item.description === 'string' ? item.description : '',
-        hashtags: Array.isArray(item.tags) ? (item.tags as string[]) : [],
-        matchRate:
+        place_id: parsePlaceId(item.place_id),
+        place_name:
+          typeof item.place_name === 'string' && item.place_name.trim()
+            ? item.place_name
+            : '이름 없는 여행지',
+        match_rate:
           typeof item.match_rate === 'number' ? item.match_rate : undefined,
       },
     ]
@@ -117,6 +133,7 @@ export function normalizeTravelTypeResult(
   }
 
   return {
+    type_key: response.type_key,
     name: response.name,
     description: response.description,
     image_url: response.image_url ?? '',

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import {
   CalendarDays,
   HelpCircle,
@@ -18,9 +19,11 @@ import {
   LoadingState,
 } from '@/components/common/status'
 import { Toast } from '@/components/common/Toast/Toast'
-import type { RecommendedDestination } from '@/features/result/result.types'
-import { css } from '@/styled-system/css'
+import { ROUTES } from '@/constants/routes'
+import { TRAVEL_TYPE_MAP } from '@/features/result/result.constants'
+import { css, cx } from '@/styled-system/css'
 import type {
+  RecommendedPlace,
   TravelTypeResult,
   VectorItem,
 } from '../../api/travelTypeResultApi'
@@ -314,6 +317,30 @@ const destinationItemStyle = css({
   bg: 'bg.canvas',
 })
 
+const destinationLinkStyle = css({
+  cursor: 'pointer',
+  transitionProperty: 'background-color, border-color, box-shadow, transform',
+  transitionDuration: '150ms',
+  _hover: {
+    bg: 'primary.soft',
+    borderColor: 'primary',
+    boxShadow: 'sm',
+    transform: 'translateY(-1px)',
+  },
+  _focusVisible: {
+    outline: 'none',
+    boxShadow: 'focus',
+  },
+  _active: {
+    transform: 'translateY(0)',
+  },
+})
+
+const destinationDisabledStyle = css({
+  cursor: 'default',
+  opacity: 0.65,
+})
+
 const rankStyle = css({
   display: 'inline-flex',
   alignItems: 'center',
@@ -405,12 +432,32 @@ interface TravelTypeHeroCardProps {
   onRetryTest: () => void
 }
 
+function resolveTypeKey(result: TravelTypeResult): string | null {
+  if (result.type_key) return result.type_key
+  const entry = (
+    Object.entries(TRAVEL_TYPE_MAP) as [string, { name: string }][]
+  ).find(([, data]) => data.name === result.name)
+  return entry ? entry[0] : null
+}
+
 function TravelTypeHeroCard({ result, onRetryTest }: TravelTypeHeroCardProps) {
   const [toastVisible, setToastVisible] = useState(false)
 
   const handleShare = async () => {
+    const typeKey = resolveTypeKey(result)
+    let shareUrl: string
+
+    if (typeKey && result.result_vector.length > 0) {
+      const vector = result.result_vector.map((v) => v.value / 100).join(',')
+      shareUrl = `${window.location.origin}/test/result?type_key=${typeKey}&vector=${vector}`
+    } else if (typeKey) {
+      shareUrl = `${window.location.origin}/test/result?type=${typeKey}`
+    } else {
+      shareUrl = window.location.href
+    }
+
     try {
-      await navigator.clipboard.writeText(window.location.href)
+      await navigator.clipboard.writeText(shareUrl)
     } catch {}
 
     setToastVisible(true)
@@ -565,7 +612,7 @@ function TravelTypeVectorCard({ vectors }: TravelTypeVectorCardProps) {
 }
 
 interface RecommendedDestinationCardProps {
-  destinations: RecommendedDestination[]
+  destinations: RecommendedPlace[]
 }
 
 function RecommendedDestinationCard({
@@ -582,19 +629,40 @@ function RecommendedDestinationCard({
 
       {destinations.length > 0 ? (
         <div className={destinationListStyle}>
-          {destinations.slice(0, 6).map((destination, index) => (
-            <article key={destination.id} className={destinationItemStyle}>
-              <span className={rankStyle}>{index + 1}</span>
-              <div className={destinationContentStyle}>
-                <h4 className={destinationNameStyle}>{destination.title}</h4>
-                {destination.matchRate !== undefined && (
-                  <span className={matchRateStyle}>
-                    {destination.matchRate}%
+          {destinations.slice(0, 6).map((destination, index) => {
+            const content = (
+              <>
+                <span className={rankStyle}>{index + 1}</span>
+                <div className={destinationContentStyle}>
+                  <span className={destinationNameStyle}>
+                    {destination.place_name}
                   </span>
-                )}
+                  <span className={matchRateStyle}>
+                    {destination.match_rate ?? 0}%
+                  </span>
+                </div>
+              </>
+            )
+
+            return destination.place_id !== null ? (
+              <Link
+                key={`${destination.place_id}-${index}`}
+                href={ROUTES.DETAIL(String(destination.place_id))}
+                className={cx(destinationItemStyle, destinationLinkStyle)}
+                aria-label={`${destination.place_name} 상세 페이지로 이동`}
+              >
+                {content}
+              </Link>
+            ) : (
+              <div
+                key={`invalid-${index}`}
+                className={cx(destinationItemStyle, destinationDisabledStyle)}
+                aria-disabled="true"
+              >
+                {content}
               </div>
-            </article>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <p className={compactEmptyStyle}>추천 여행지가 아직 없어요.</p>
